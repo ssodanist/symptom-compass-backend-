@@ -141,5 +141,66 @@ app.delete('/api/account', async (req, res) => {
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
+/* ===================== 알약 식별 (식품의약품안전처 낱알식별정보) =====================
+   데이터 출처: 공공데이터포털 "식품의약품안전처_의약품 낱알식별 정보"
+   https://www.data.go.kr/data/15057639/openapi.do
+   ⚠️ 발급받으실 때 "Decoding" 키를 DATA_GO_KR_KEY에 넣으세요.
+   ⚠️ 파라미터명(drug_shape, print_front 등)은 문서 버전에 따라 다를 수 있어요.
+      키 발급 후 바로 테스트해보시고, 결과가 이상하면 원인을 같이 찾아드릴게요. */
+app.get('/api/pills', async (req, res) => {
+  if (!process.env.DATA_GO_KR_KEY) {
+    return res.status(500).json({ error: 'DATA_GO_KR_KEY가 설정되지 않았어요. .env를 확인해주세요.' });
+  }
+
+  const { shape, color, frontMark, backMark, name } = req.query;
+  if (!shape && !color && !frontMark && !backMark && !name) {
+    return res.status(400).json({ error: '모양·색상·각인·이름 중 최소 하나는 입력해주세요.' });
+  }
+
+  try {
+    const params = new URLSearchParams({
+      serviceKey: process.env.DATA_GO_KR_KEY,
+      pageNo: '1',
+      numOfRows: '20',
+      type: 'json'
+    });
+    if (shape) params.set('drug_shape', shape);
+    if (color) params.set('color_class1', color);
+    if (frontMark) params.set('print_front', frontMark);
+    if (backMark) params.set('print_back', backMark);
+    if (name) params.set('item_name', name);
+
+    const url = `https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService03/getMdcinGrnIdntfcInfoList03?${params.toString()}`;
+    const apiRes = await fetch(url);
+    const data = await apiRes.json();
+
+    const header = data?.body?.items ? null : data?.header;
+    if (header && header.resultCode && header.resultCode !== '00') {
+      console.error('낱알식별 API 오류:', header);
+      return res.status(502).json({ error: `API 오류: ${header.resultMsg || header.resultCode}` });
+    }
+
+    let items = data?.body?.items || [];
+    if (!Array.isArray(items)) items = [items];
+
+    const pills = items.map(it => ({
+      name: it.ITEM_NAME,
+      entpName: it.ENTP_NAME,
+      shape: it.DRUG_SHAPE,
+      color1: it.COLOR_CLASS1,
+      color2: it.COLOR_CLASS2 || null,
+      frontMark: it.PRINT_FRONT || null,
+      backMark: it.PRINT_BACK || null,
+      formName: it.FORM_CODE_NAME || null,
+      image: it.ITEM_IMAGE || null
+    }));
+
+    res.json({ pills });
+  } catch (err) {
+    console.error('낱알식별 조회 오류:', err);
+    res.status(500).json({ error: '약 정보를 불러오는 중 오류가 발생했어요.' });
+  }
+});
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`서버 실행 중: http://localhost:${PORT}`));
