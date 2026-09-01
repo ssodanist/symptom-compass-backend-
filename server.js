@@ -144,9 +144,13 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 /* ===================== 알약 식별 (식품의약품안전처 낱알식별정보) =====================
    데이터 출처: 공공데이터포털 "식품의약품안전처_의약품 낱알식별 정보"
    https://www.data.go.kr/data/15057639/openapi.do
-   ⚠️ 발급받으실 때 "Decoding" 키를 DATA_GO_KR_KEY에 넣으세요.
-   ⚠️ 파라미터명(drug_shape, print_front 등)은 문서 버전에 따라 다를 수 있어요.
-      키 발급 후 바로 테스트해보시고, 결과가 이상하면 원인을 같이 찾아드릴게요. */
+
+   ⚠️ 중요: 이 API는 모양·색상·각인으로 "검색"하는 요청 파라미터를 제공하지 않아요.
+   검색 가능한 요청 파라미터는 item_name(품목명), entp_name(업체명), item_seq, edi_code, bizrno 뿐입니다.
+   모양·색상·각인 정보는 "응답 결과" 안에는 들어있어서, 넉넉히 데이터를 받아온 뒤
+   우리 서버에서 직접 대조해서 걸러내는 방식으로 구현했습니다.
+   → 품목명 없이 모양·색상·각인만으로 검색하면, 정부 API가 한 번에 주는 데이터(최대 100건)
+      안에서만 찾기 때문에 결과가 안 나올 수 있어요. 이름을 조금이라도 아시면 같이 입력해주세요. */
 app.get('/api/pills', async (req, res) => {
   if (!process.env.DATA_GO_KR_KEY) {
     return res.status(500).json({ error: 'DATA_GO_KR_KEY가 설정되지 않았어요. .env를 확인해주세요.' });
@@ -161,13 +165,9 @@ app.get('/api/pills', async (req, res) => {
     const params = new URLSearchParams({
       serviceKey: process.env.DATA_GO_KR_KEY,
       pageNo: '1',
-      numOfRows: '100',
+      numOfRows: '100', // 이 API가 실제 지원하는 요청 파라미터는 item_name/entp_name/item_seq/edi_code/bizrno 뿐입니다.
       type: 'json'
     });
-    if (shape) params.set('drug_shape', shape);
-    if (color) params.set('color_class1', color);
-    if (frontMark) params.set('print_front', frontMark);
-    if (backMark) params.set('print_back', backMark);
     if (name) params.set('item_name', name);
 
     const url = `https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService03/getMdcinGrnIdntfcInfoList03?${params.toString()}`;
@@ -183,10 +183,18 @@ app.get('/api/pills', async (req, res) => {
     let items = data?.body?.items || [];
     if (!Array.isArray(items)) items = [items];
 
-    // 임시 디버그: 결과가 0건일 때 정부 API가 실제로 뭐라고 응답했는지 그대로 보여줍니다.
-    if (items.length === 0) {
-      return res.json({ pills: [], _debug: data });
-    }
+    // 모양·색상·각인은 응답 데이터를 우리 서버에서 직접 대조해서 걸러냅니다.
+    items = items.filter(it => {
+      if (shape && it.DRUG_SHAPE !== shape) return false;
+      if (color) {
+        const c1 = it.COLOR_CLASS1 || '';
+        const c2 = it.COLOR_CLASS2 || '';
+        if (!c1.includes(color) && !c2.includes(color)) return false;
+      }
+      if (frontMark && !(it.PRINT_FRONT || '').toUpperCase().includes(frontMark.toUpperCase())) return false;
+      if (backMark && !(it.PRINT_BACK || '').toUpperCase().includes(backMark.toUpperCase())) return false;
+      return true;
+    });
 
     const pills = items.slice(0, 20).map(it => ({
       name: it.ITEM_NAME,
