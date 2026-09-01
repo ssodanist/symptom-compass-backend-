@@ -152,8 +152,9 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
    → 품목명 없이 모양·색상·각인만으로 검색하면, 정부 API가 한 번에 주는 데이터(최대 100건)
       안에서만 찾기 때문에 결과가 안 나올 수 있어요. 이름을 조금이라도 아시면 같이 입력해주세요. */
 app.get('/api/pills', async (req, res) => {
-  if (!process.env.DATA_GO_KR_KEY) {
-    return res.status(500).json({ error: 'DATA_GO_KR_KEY가 설정되지 않았어요. .env를 확인해주세요.' });
+  const apiKey = process.env.DATA_GO_KR_KEY_PILLS || process.env.DATA_GO_KR_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'DATA_GO_KR_KEY(_PILLS)가 설정되지 않았어요. .env를 확인해주세요.' });
   }
 
   const { shape, color, frontMark, backMark, name } = req.query;
@@ -163,7 +164,7 @@ app.get('/api/pills', async (req, res) => {
 
   try {
     const params = new URLSearchParams({
-      serviceKey: process.env.DATA_GO_KR_KEY,
+      serviceKey: apiKey,
       pageNo: '1',
       numOfRows: '100', // 이 API가 실제 지원하는 요청 파라미터는 item_name/entp_name/item_seq/edi_code/bizrno 뿐입니다.
       type: 'json'
@@ -220,8 +221,9 @@ app.get('/api/pills', async (req, res) => {
    https://www.data.go.kr/data/15075057/openapi.do
    이름으로 검색해서 일반인이 이해하기 쉬운 문장으로 효능·용법·주의사항 등을 제공합니다. */
 app.get('/api/drug-info', async (req, res) => {
-  if (!process.env.DATA_GO_KR_KEY) {
-    return res.status(500).json({ error: 'DATA_GO_KR_KEY가 설정되지 않았어요. .env를 확인해주세요.' });
+  const apiKey = process.env.DATA_GO_KR_KEY_DRUGINFO || process.env.DATA_GO_KR_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'DATA_GO_KR_KEY(_DRUGINFO)가 설정되지 않았어요. .env를 확인해주세요.' });
   }
 
   const { name } = req.query;
@@ -231,7 +233,7 @@ app.get('/api/drug-info', async (req, res) => {
 
   try {
     const params = new URLSearchParams({
-      serviceKey: process.env.DATA_GO_KR_KEY,
+      serviceKey: apiKey,
       pageNo: '1',
       numOfRows: '10',
       type: 'json',
@@ -250,10 +252,12 @@ app.get('/api/drug-info', async (req, res) => {
 
     let items = data?.body?.items || [];
     if (!Array.isArray(items)) items = [items];
+
     // 임시 디버그: 결과가 0건일 때 정부 API가 실제로 뭐라고 응답했는지 그대로 보여줍니다.
     if (items.length === 0) {
       return res.json({ drugs: [], _debug: data });
     }
+
     const drugs = items.slice(0, 10).map(it => ({
       name: it.itemName,
       entpName: it.entpName,
