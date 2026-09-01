@@ -161,7 +161,7 @@ app.get('/api/pills', async (req, res) => {
     const params = new URLSearchParams({
       serviceKey: process.env.DATA_GO_KR_KEY,
       pageNo: '1',
-      numOfRows: '20',
+      numOfRows: '100',
       type: 'json'
     });
     if (shape) params.set('drug_shape', shape);
@@ -170,7 +170,7 @@ app.get('/api/pills', async (req, res) => {
     if (backMark) params.set('print_back', backMark);
     if (name) params.set('item_name', name);
 
-    const url = `https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService03/getMdcinGrnIdntfcInfoList03?${params.toString()}`;
+    const url = `https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService01/getMdcinGrnIdntfcInfoList01?${params.toString()}`;
     const apiRes = await fetch(url);
     const data = await apiRes.json();
 
@@ -183,7 +183,22 @@ app.get('/api/pills', async (req, res) => {
     let items = data?.body?.items || [];
     if (!Array.isArray(items)) items = [items];
 
-    const pills = items.map(it => ({
+    // 안전장치: 공공API가 서버 측에서 필터링을 제대로 안 해줄 수 있어서,
+    // 실제 반환된 값을 기준으로 우리 쪽에서 한 번 더 정확히 걸러냅니다.
+    items = items.filter(it => {
+      if (shape && it.DRUG_SHAPE !== shape) return false;
+      if (color) {
+        const c1 = it.COLOR_CLASS1 || '';
+        const c2 = it.COLOR_CLASS2 || '';
+        if (!c1.includes(color) && !c2.includes(color)) return false;
+      }
+      if (frontMark && !(it.PRINT_FRONT || '').toUpperCase().includes(frontMark.toUpperCase())) return false;
+      if (backMark && !(it.PRINT_BACK || '').toUpperCase().includes(backMark.toUpperCase())) return false;
+      if (name && !(it.ITEM_NAME || '').includes(name)) return false;
+      return true;
+    });
+
+    const pills = items.slice(0, 20).map(it => ({
       name: it.ITEM_NAME,
       entpName: it.ENTP_NAME,
       shape: it.DRUG_SHAPE,
