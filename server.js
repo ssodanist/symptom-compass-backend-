@@ -170,7 +170,7 @@ app.get('/api/pills', async (req, res) => {
     if (backMark) params.set('print_back', backMark);
     if (name) params.set('item_name', name);
 
-    const url = `https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService01/getMdcinGrnIdntfcInfoList01?${params.toString()}`;
+    const url = `https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService03/getMdcinGrnIdntfcInfoList03?${params.toString()}`;
     const apiRes = await fetch(url);
     const data = await apiRes.json();
 
