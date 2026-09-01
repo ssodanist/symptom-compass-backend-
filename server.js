@@ -219,7 +219,7 @@ app.get('/api/pills', async (req, res) => {
    데이터 출처: 공공데이터포털 "식품의약품안전처_의약품개요정보(e약은요)"
    https://www.data.go.kr/data/15075057/openapi.do
    이름으로 검색해서 일반인이 이해하기 쉬운 문장으로 효능·용법·주의사항 등을 제공합니다. */
-app.get('/api/drug-info', async (req, res) => {
+app.get('/api/drug-info',async(req, res)=>{
   if (!process.env.DATA_GO_KR_KEY) {
     return res.status(500).json({ error: 'DATA_GO_KR_KEY가 설정되지 않았어요. .env를 확인해주세요.' });
   }
