@@ -215,5 +215,61 @@ app.get('/api/pills', async (req, res) => {
   }
 });
 
+/* ===================== 약 이름으로 효능·용법·주의사항 검색 (e약은요) =====================
+   데이터 출처: 공공데이터포털 "식품의약품안전처_의약품개요정보(e약은요)"
+   https://www.data.go.kr/data/15075057/openapi.do
+   이름으로 검색해서 일반인이 이해하기 쉬운 문장으로 효능·용법·주의사항 등을 제공합니다. */
+app.get('/api/drug-info', async (req, res) => {
+  if (!process.env.DATA_GO_KR_KEY) {
+    return res.status(500).json({ error: 'DATA_GO_KR_KEY가 설정되지 않았어요. .env를 확인해주세요.' });
+  }
+
+  const { name } = req.query;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: '약 이름을 입력해주세요.' });
+  }
+
+  try {
+    const params = new URLSearchParams({
+      serviceKey: process.env.DATA_GO_KR_KEY,
+      pageNo: '1',
+      numOfRows: '10',
+      type: 'json',
+      itemName: name.trim()
+    });
+
+    const url = `https://apis.data.go.kr/1471000/DrbEasyDrugInfoService/getDrbEasyDrugList?${params.toString()}`;
+    const apiRes = await fetch(url);
+    const data = await apiRes.json();
+
+    const header = data?.body?.items ? null : data?.header;
+    if (header && header.resultCode && header.resultCode !== '00') {
+      console.error('e약은요 API 오류:', header);
+      return res.status(502).json({ error: `API 오류: ${header.resultMsg || header.resultCode}` });
+    }
+
+    let items = data?.body?.items || [];
+    if (!Array.isArray(items)) items = [items];
+
+    const drugs = items.slice(0, 10).map(it => ({
+      name: it.itemName,
+      entpName: it.entpName,
+      image: it.itemImage || null,
+      efficacy: it.efcyQesitm || null,       // 효능효과
+      usage: it.useMethodQesitm || null,     // 용법용량
+      caution: it.atpnQesitm || null,        // 주의사항 (일반)
+      cautionWarn: it.atpnWarnQesitm || null,// 주의사항 (경고)
+      interaction: it.intrcQesitm || null,   // 상호작용
+      sideEffect: it.seQesitm || null,       // 부작용
+      storage: it.depositMethodQesitm || null // 보관법
+    }));
+
+    res.json({ drugs });
+  } catch (err) {
+    console.error('약 정보 조회 오류:', err);
+    res.status(500).json({ error: '약 정보를 불러오는 중 오류가 발생했어요.' });
+  }
+});
+
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`서버 실행 중: http://localhost:${PORT}`));
