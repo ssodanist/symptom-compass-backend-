@@ -139,6 +139,45 @@ app.delete('/api/account', async (req, res) => {
   }
 });
 
+// 로그인된 사용자의 uid를 세션 쿠키에서 꺼냅니다. 로그인 안 되어있으면 null.
+function getAuthedUserId(req) {
+  const token = req.cookies.session;
+  if (!token) return null;
+  try {
+    return jwt.verify(token, JWT_SECRET).uid;
+  } catch {
+    return null;
+  }
+}
+
+// 응급 의료정보 카드 + 건강검진용 출생연도/성별 조회
+app.get('/api/health-profile', async (req, res) => {
+  const uid = getAuthedUserId(req);
+  if (!uid) return res.status(401).json({ error: '로그인이 필요합니다.' });
+
+  try {
+    const profile = await db.getHealthProfile(uid);
+    res.json({ profile });
+  } catch (err) {
+    console.error('건강정보 조회 오류:', err);
+    res.status(500).json({ error: '건강정보를 불러오는 중 오류가 발생했어요.' });
+  }
+});
+
+// 응급 의료정보 카드 + 건강검진용 출생연도/성별 저장 (넘어온 필드만 갱신)
+app.put('/api/health-profile', async (req, res) => {
+  const uid = getAuthedUserId(req);
+  if (!uid) return res.status(401).json({ error: '로그인이 필요합니다.' });
+
+  try {
+    const profile = await db.upsertHealthProfile(uid, req.body || {});
+    res.json({ profile });
+  } catch (err) {
+    console.error('건강정보 저장 오류:', err);
+    res.status(500).json({ error: '건강정보를 저장하는 중 오류가 발생했어요.' });
+  }
+});
+
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
 /* ===================== 알약 식별 (식품의약품안전처 낱알식별정보) =====================
