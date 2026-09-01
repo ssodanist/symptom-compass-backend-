@@ -161,7 +161,7 @@ app.get('/api/pills', async (req, res) => {
     const params = new URLSearchParams({
       serviceKey: process.env.DATA_GO_KR_KEY,
       pageNo: '1',
-      numOfRows: '20',
+      numOfRows: '100',
       type: 'json'
     });
     if (shape) params.set('drug_shape', shape);
@@ -170,7 +170,7 @@ app.get('/api/pills', async (req, res) => {
     if (backMark) params.set('print_back', backMark);
     if (name) params.set('item_name', name);
 
-    const url = `https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService03/getMdcinGrnIdntfcInfoList03?${params.toString()}`;
+    const url = `https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService01/getMdcinGrnIdntfcInfoList01?${params.toString()}`;
     const apiRes = await fetch(url);
     const data = await apiRes.json();
 
@@ -183,7 +183,12 @@ app.get('/api/pills', async (req, res) => {
     let items = data?.body?.items || [];
     if (!Array.isArray(items)) items = [items];
 
-    const pills = items.map(it => ({
+    // 임시 디버그: 결과가 0건일 때 정부 API가 실제로 뭐라고 응답했는지 그대로 보여줍니다.
+    if (items.length === 0) {
+      return res.json({ pills: [], _debug: data });
+    }
+
+    const pills = items.slice(0, 20).map(it => ({
       name: it.ITEM_NAME,
       entpName: it.ENTP_NAME,
       shape: it.DRUG_SHAPE,
