@@ -250,7 +250,10 @@ app.get('/api/drug-info', async (req, res) => {
 
     let items = data?.body?.items || [];
     if (!Array.isArray(items)) items = [items];
-
+    // 임시 디버그: 결과가 0건일 때 정부 API가 실제로 뭐라고 응답했는지 그대로 보여줍니다.
+    if (items.length === 0) {
+      return res.json({ drugs: [], _debug: data });
+    }
     const drugs = items.slice(0, 10).map(it => ({
       name: it.itemName,
       entpName: it.entpName,
