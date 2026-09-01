@@ -183,6 +183,11 @@ app.get('/api/pills', async (req, res) => {
     let items = data?.body?.items || [];
     if (!Array.isArray(items)) items = [items];
 
+    // 임시 디버그: 결과가 0건일 때 정부 API가 실제로 뭐라고 응답했는지 그대로 보여줍니다.
+    if (items.length === 0) {
+      return res.json({ pills: [], _debug: data });
+    }
+
     const pills = items.slice(0, 20).map(it => ({
       name: it.ITEM_NAME,
       entpName: it.ENTP_NAME,
